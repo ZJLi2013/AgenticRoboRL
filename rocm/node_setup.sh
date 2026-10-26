@@ -22,8 +22,13 @@ if [ ! -d RPent ]; then
   git -C RPent checkout -q "$REV"
   git -C RPent apply "$PATCH"
 fi
+# MI300 deployment changes on top of the paper's tree (OSMesa for the spawned env_server); the tree check
+# runs on the paper's tree alone, so this patch is taken off first on a rerun.
+MI_PATCH=$ROOT/src/AgenticRoboRL/rocm/rpent_mi300.patch
+git -C RPent apply --reverse --check "$MI_PATCH" 2>/dev/null && git -C RPent apply --reverse "$MI_PATCH"
 git -C RPent add -A
 [ "$(git -C RPent write-tree)" = "$TREE" ] || { echo "RPent tree != $TREE"; exit 1; }
+git -C RPent apply "$MI_PATCH"
 
 # The image's ROCm build; without the override the extras resolve CUDA torch from PyPI.
 # PyPI `triton` (CUDA) shares the `triton/` directory with pytorch-triton-rocm and segfaults on import.
