@@ -44,7 +44,7 @@ if uv pip show --python "$PY" triton >/dev/null 2>&1 || ! has_rocm_triton; then
   install --reinstall-package pytorch-triton-rocm
 fi
 has_rocm_triton
-liberopro_req=$(uv pip freeze --python "$PY" | awk '$1 == "rpent-liberopro" {print}')
+liberopro_req=$(uv pip freeze --python "$PY" | grep -E '^rpent-liberopro( |==|@)')
 uv pip install --python "$PY" --link-mode copy --reinstall-package rpent-liberopro --no-deps "$liberopro_req"
 
 venv/rpent/bin/liberopro-download-assets --skip-existing
