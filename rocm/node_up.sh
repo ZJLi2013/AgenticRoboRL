@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Runs on the GPU node host: create `arl-rpent` (RPent + controller) on GPUS, and one `arl-vllm-<gpu>`
+# Runs on the GPU node host: create `arl-rpent` (RPent + controller), and one `arl-vllm-<gpu>`
 # (port 18100 + its index in VLLM_GPUS) per GPU in VLLM_GPUS. Existing containers are left alone.
-# Usage: GPUS=6,7 VLLM_GPUS=6,7 WEIGHTS=/data/zhengjli/arl/ckpt/rl-v006 bash node_up.sh
+# `arl-rpent` sees every GPU: the harness picks one per process with `--cuda-device {gpu}` (CUDA_VISIBLE_DEVICES).
+# Usage: VLLM_GPUS=6,7 WEIGHTS=/data/zhengjli/arl/ckpt/rl-v006 bash node_up.sh
 set -euo pipefail
 
-GPUS=${GPUS:?comma-separated idle GPU indices}
 VLLM_GPUS=${VLLM_GPUS:-}
 WEIGHTS=${WEIGHTS:-/data/zhengjli/arl/ckpt/rl-v006}
 RPENT_IMAGE=rlinf/rlinf:agentic-rlinf0.3-libero-rocm6.4
@@ -13,7 +13,7 @@ GPU_ARGS=(--device /dev/kfd --device /dev/dri --group-add video --security-opt s
 exists() { docker ps -a --format '{{.Names}}' | grep -qx "$1"; }
 
 exists arl-rpent || docker run -d --name arl-rpent --network host --ipc host --shm-size 32g "${GPU_ARGS[@]}" \
-  -e HIP_VISIBLE_DEVICES="$GPUS" -e MUJOCO_GL=osmesa -e PYOPENGL_PLATFORM=osmesa -e LIBERO_TYPE=pro \
+  -e MUJOCO_GL=osmesa -e PYOPENGL_PLATFORM=osmesa -e LIBERO_TYPE=pro \
   -v /data:/data "$RPENT_IMAGE" sleep infinity
 
 i=0

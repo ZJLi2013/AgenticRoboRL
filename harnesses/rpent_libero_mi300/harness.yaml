@@ -1,0 +1,53 @@
+# harnesses/rpent_libero on AMD MI300 (ROCm), evaluation only. Differences from that file:
+#   - no model.serve_cmd: the planner runs in its own vLLM ROCm container (rocm/node_up.sh), reached at model_port;
+#     its --served-model-name is the weights path, so {weights} must be that same path
+#   - MuJoCo renders with OSMesa (no EGL device on the node)
+#   - tasks: tasks_t2.jsonl, every fourth task of ../rpent_libero/tasks.jsonl with eval init 1 only
+# The eval command is unchanged.
+#
+#   python rl/local_ctl.py eval --config harnesses/rpent_libero_mi300/harness.yaml --run-dir runs/t2/g6 \
+#          --weights /data/zhengjli/arl/ckpt/rl-v006 --tag rl_v006 --init-key eval_init_ids --shard 0/2 \
+#          --var gpu=6 --var model_port=18100 --var proxy_port=18200 --var vla_port=18300 --var sam3_port=18400
+name: rpent_libero_mi300
+adapter: rpent_libero
+tasks: tasks_t2.jsonl
+group_size: 6
+episodes_parallel: 4
+proxy_port: "{proxy_port}"
+model:
+  url: http://127.0.0.1:{model_port}
+services:
+  - name: pi05
+    cmd: >-
+      PI05_CHECKPOINT_PATH=$PI05_CHECKPOINT $RPENT_ENV/bin/python -m rpent.robots.components.pi05_vla_server
+      --transport http --host 127.0.0.1 --port {vla_port} --cuda-device {gpu}
+    ready_timeout_s: 900
+  - name: sam3
+    cmd: >-
+      SAM3_CHECKPOINT_PATH=$SAM3_CHECKPOINT $RPENT_ENV/bin/python -m rpent.robots.components.sam3_server
+      --transport http --host 127.0.0.1 --port {sam3_port} --cuda-device {gpu}
+    ready_timeout_s: 900
+episode:
+  dir: "local/{suite}/task_{task:02d}/seed_{init_id:03d}/attempt_{attempt:02d}"
+  cwd: $RPENT_DIR
+  timeout_s: 7500
+  env: {MUJOCO_GL: osmesa, PYOPENGL_PLATFORM: osmesa, OPENAI_API_KEY: EMPTY}
+  cmd: >-
+    $RPENT_ENV/bin/python -m rpent.cli.main --robot libero --libero-type pro
+    --suite {suite} --task {task} --seed {init_id} --output-dir {episode_dir} --cuda-device {gpu}
+    --base-url {model_url}
+    --vla-endpoint http://127.0.0.1:{vla_port} --sam3-endpoint http://127.0.0.1:{sam3_port}
+    --planner api --model openai-chat:{weights} --knowledge-profile proven --no-send-back-thinking --reasoning-effort low
+    --max-turns 100 --max-tokens 32768 --planner-timeout-s 7200
+    --temperature 1.0 --top-p 1.0 --presence-penalty 0.0
+    --generation-seed $((({round} + 1) * 100000 + {attempt}))
+eval:
+  direct: true
+  cmd: >-
+    $RPENT_ENV/bin/python -m rpent.cli.main --robot libero --libero-type pro
+    --suite {suite} --task {task} --seed {init_id} --output-dir {episode_dir} --cuda-device {gpu}
+    --base-url {model_url}
+    --vla-endpoint http://127.0.0.1:{vla_port} --sam3-endpoint http://127.0.0.1:{sam3_port}
+    --planner api --model openai-chat:{weights} --knowledge-profile proven --no-send-back-thinking --reasoning-effort low
+    --max-turns 100 --max-tokens 32768 --planner-timeout-s 7200
+    --temperature 1.0 --top-p 0.95 --top-k 20 --presence-penalty 1.5 --generation-seed 3407
