@@ -51,6 +51,19 @@ fi
 has_rocm_triton
 liberopro_req=$(uv pip freeze --python "$PY" | grep -E '^rpent-liberopro( |==|@)')
 uv pip install --python "$PY" --link-mode copy --reinstall-package rpent-liberopro --no-deps "$liberopro_req"
+# liberopro's floor robots kept robosuite 1.4's "no mount" (None) as their 1.5 default_base, which robosuite 1.5.2
+# looks up in BASE_MAPPING and crashes on; its "no mount" is NullMount. Every libero_object_* cell needs this.
+"$PY" - <<'EOF'
+import glob, os, re
+import liberopro.liberopro.envs.robots as pkg
+robots = os.path.dirname(pkg.__file__)
+for f in sorted(glob.glob(os.path.join(robots, "*.py"))):
+    src = open(f).read()
+    new = re.sub(r"(def default_base\(self\):\s*\n\s*return )None\b", r'\1"NullMount"', src)
+    if new != src:
+        open(f, "w").write(new)
+        print("default_base -> NullMount:", os.path.basename(f))
+EOF
 
 # sam3 0.1.4 ships without the CLIP BPE vocabulary it loads from <site-packages>/assets/.
 BPE=$("$PY" -c "import os, sam3; print(os.path.join(os.path.dirname(os.path.dirname(sam3.__file__)), 'assets', 'bpe_simple_vocab_16e6.txt.gz'))")
@@ -67,6 +80,9 @@ venv/rpent/bin/liberopro-download-assets --skip-existing
 import torch
 print("torch", torch.__version__, "hip", torch.version.hip, "cuda_available", torch.cuda.is_available(), "devices", torch.cuda.device_count())
 import mujoco, sam3, openpi, libero.libero, transformers, pydantic_ai  # noqa: F401
+from robosuite.models.bases import BASE_MAPPING
+from liberopro.liberopro.envs.robots import OnTheGroundPanda
+assert OnTheGroundPanda().default_base in BASE_MAPPING
 print("mujoco", mujoco.__version__, "transformers", transformers.__version__, "imports ok")
 EOF
 ls -la ckpt/sam3
