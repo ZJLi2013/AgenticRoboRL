@@ -52,6 +52,14 @@ has_rocm_triton
 liberopro_req=$(uv pip freeze --python "$PY" | grep -E '^rpent-liberopro( |==|@)')
 uv pip install --python "$PY" --link-mode copy --reinstall-package rpent-liberopro --no-deps "$liberopro_req"
 
+# sam3 0.1.4 ships without the CLIP BPE vocabulary it loads from <site-packages>/assets/.
+BPE=$("$PY" -c "import os, sam3; print(os.path.join(os.path.dirname(os.path.dirname(sam3.__file__)), 'assets', 'bpe_simple_vocab_16e6.txt.gz'))")
+if [ ! -f "$BPE" ]; then
+  mkdir -p "$(dirname "$BPE")"
+  curl -fsSL -o "$BPE" https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz
+fi
+echo "924691ac288e54409236115652ad4aa250f48203de50a9e4722a6ecd48d6804a  $BPE" | sha256sum -c -
+
 venv/rpent/bin/liberopro-download-assets --skip-existing
 [ -f ckpt/sam3/sam3.pt ] || venv/rpent/bin/modelscope download --model facebook/sam3 sam3.pt --local_dir ckpt/sam3
 
