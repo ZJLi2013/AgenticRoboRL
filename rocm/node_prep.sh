@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# srdc-18: create /data/zhengjli/arl (needs a root container) and download a checkpoint subfolder.
+# On the GPU node host: create /data/zhengjli/arl (needs a root container) and download a checkpoint subfolder.
 # usage: bash node_prep.sh [subfolder ...]   (default: rl-v006)
 set -euo pipefail
 ROOT=/data/zhengjli/arl
