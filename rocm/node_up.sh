@@ -4,10 +4,12 @@
 # `arl-rpent` sees every GPU: the harness picks one per process with `--cuda-device {gpu}` (CUDA_VISIBLE_DEVICES).
 # The paper's serve flags plus --attention-backend TRITON_ATTN: the hybrid model forces a 528-token attention block,
 # which the default ROCm backend serves through a slow fallback (decode at 48k context: 17.5 tok/s vs 133 tok/s).
-# Usage: VLLM_GPUS=6,7 WEIGHTS=/data/zhengjli/arl/ckpt/rl-v006 bash node_up.sh
+# Usage: VLLM_GPUS=6,7 WEIGHTS=/data/zhengjli/arl/ckpt/rl-v006 [SUFFIX=-sft] bash node_up.sh
+# SUFFIX names the planner containers arl-vllm-<gpu><SUFFIX>, so servers of other weights can sit beside stopped ones.
 set -euo pipefail
 
 VLLM_GPUS=${VLLM_GPUS:-}
+SUFFIX=${SUFFIX:-}
 WEIGHTS=${WEIGHTS:-/data/zhengjli/arl/ckpt/rl-v006}
 RPENT_IMAGE=rlinf/rlinf:agentic-rlinf0.3-libero-rocm6.4
 VLLM_IMAGE=vllm/vllm-openai-rocm:v0.32.0
@@ -20,7 +22,7 @@ exists arl-rpent || docker run -d --name arl-rpent --network host --ipc host --s
 
 i=0
 for g in ${VLLM_GPUS//,/ }; do
-  name=arl-vllm-$g port=$((18100 + i))
+  name=arl-vllm-$g$SUFFIX port=$((18100 + i))
   exists "$name" || docker run -d --name "$name" --network host --ipc host --shm-size 16g "${GPU_ARGS[@]}" \
     -e HIP_VISIBLE_DEVICES="$g" -e HF_HOME=/data/zhengjli/arl/hf-cache -v /data:/data \
     --entrypoint vllm "$VLLM_IMAGE" serve "$WEIGHTS" --served-model-name "$WEIGHTS" \
